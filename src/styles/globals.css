@@ -1,0 +1,78 @@
+@import url('https://fonts.googleapis.com/css2?family=Work+Sans:wght@300;400;500;600;700&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  font-family: 'Work Sans', 'Segoe UI', sans-serif;
+  font-size: 14px;
+  background: #f5f4ef;
+  color: #1a1915;
+  -webkit-font-smoothing: antialiased;
+}
+
+input, select, textarea, button { font-family: inherit; }
+input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; }
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: #f5f4ef; }
+::-webkit-scrollbar-thumb { background: #e8e6df; border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: #d4d1c9; }
+
+/* ── Utility classes ─────────────────────────────────────────── */
+.row-hover:hover  { background: #f0efe9 !important; }
+.listing-row      { transition: background .12s; cursor: pointer; }
+.listing-row:hover { background: #f0efe9 !important; }
+.listing-row:hover .listing-arrow { opacity: 1 !important; transform: translateX(2px); }
+.listing-arrow    { transition: opacity .15s, transform .15s; }
+
+.tab-item         { transition: color .15s, border-color .15s; }
+.tab-item:hover   { color: #1a1915 !important; }
+
+.btn-primary      { transition: background .15s, box-shadow .15s; }
+.btn-primary:hover { background: #b85a3a !important; box-shadow: 0 2px 8px rgba(201,100,66,.25) !important; }
+
+.btn-ghost        { transition: background .15s, border-color .15s; }
+.btn-ghost:hover  { background: #f0efe9 !important; border-color: #d4d1c9 !important; }
+
+.cell-input {
+  background: transparent; border: none; outline: none;
+  color: #1a1915; font-family: 'Work Sans', monospace;
+  font-size: 12.5px; width: 100%; text-align: right; padding: 0;
+}
+.cell-input::placeholder { color: #c4c2ba; }
+
+td:focus-within {
+  background: #fdf0eb !important;
+  outline: 2px solid #c96442;
+  outline-offset: -2px;
+  z-index: 1;
+  position: relative;
+}
+
+.sheet-row:hover td           { background: #f0efe9; }
+.sheet-row:hover .sticky-left { background: #f0efe9 !important; }
+
+.chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 8px; border-radius: 99px;
+  font-size: 11.5px; font-weight: 500;
+}
+
+.month-card { transition: box-shadow .15s, border-color .15s; cursor: pointer; }
+.month-card:hover { box-shadow: 0 4px 12px rgba(26,25,21,0.08) !important; border-color: #d4d1c9 !important; }
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.fade-up { animation: fadeUp .2s ease; }
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+.spinner {
+  width: 20px; height: 20px; border-radius: 50%;
+  border: 2px solid #e8e6df;
+  border-top-color: #c96442;
+  animation: spin .7s linear infinite;
+}
