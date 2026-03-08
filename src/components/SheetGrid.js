@@ -1,12 +1,20 @@
 'use client';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { C, FULL_MONTHS, getColor, fmt, padZ, daysInMonth } from '@/lib/constants';
 
 const today = new Date();
 const CY = today.getFullYear(), CM = today.getMonth();
 
+const LinedCommentIcon = ({ color, size = 18, style = {} }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={style}>
+    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+    <line x1="9" y1="8" x2="15" y2="8" />
+    <line x1="9" y1="12" x2="15" y2="12" />
+  </svg>
+);
+
 export default function SheetGrid({ year, month, transactions, saveSheet, onBack, expenseCats, incomeTypes, saving }) {
-  const days   = daysInMonth(year, month);
+  const days = daysInMonth(year, month);
   const dayArr = Array.from({ length: days }, (_, i) => i + 1);
   const allCats = [...expenseCats, ...incomeTypes];
 
@@ -17,24 +25,62 @@ export default function SheetGrid({ year, month, transactions, saveSheet, onBack
     transactions.filter(t => t.date.startsWith(monthKey)).forEach(t => {
       const day = parseInt(t.date.slice(8));
       if (!g[t.category]) g[t.category] = {};
-      g[t.category][day] = ((g[t.category][day] || 0) + Number(t.amount)).toString();
+      g[t.category][day] = {
+        amount: Number(t.amount).toString(),
+        note: t.note || ''
+      };
     });
     return g;
-  }, []); // eslint-disable-line
+  }, [allCats, month, year, transactions]);
 
-  const [grid, setGrid]   = useState(initGrid);
+  const [grid, setGrid] = useState(initGrid);
   const [dirty, setDirty] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [focusedCell, setFocusedCell] = useState(null); // { cat, day }
+  const [popoverCell, setPopoverCell] = useState(null); // { cat, day }
+  const [tempNote, setTempNote] = useState('');
+  const blurTimeoutRef = useRef(null);
 
-  const rowTotal   = cat => dayArr.reduce((s, d) => s + Number(grid[cat]?.[d] || 0), 0);
-  const dayExpense = d   => expenseCats.reduce((s, c) => s + Number(grid[c]?.[d] || 0), 0);
-  const dayIncome  = d   => incomeTypes.reduce((s, c) => s + Number(grid[c]?.[d] || 0), 0);
+  const rowTotal = cat => dayArr.reduce((s, d) => s + Number(grid[cat]?.[d]?.amount || 0), 0);
+  const dayExpense = d => expenseCats.reduce((s, c) => s + Number(grid[c]?.[d]?.amount || 0), 0);
+  const dayIncome = d => incomeTypes.reduce((s, c) => s + Number(grid[c]?.[d]?.amount || 0), 0);
   const totalExpense = dayArr.reduce((s, d) => s + dayExpense(d), 0);
-  const totalIncome  = dayArr.reduce((s, d) => s + dayIncome(d), 0);
+  const totalIncome = dayArr.reduce((s, d) => s + dayIncome(d), 0);
 
   const handleCell = (cat, day, val) => {
-    setGrid(g => ({ ...g, [cat]: { ...g[cat], [day]: val } }));
+    setGrid(g => {
+      const existing = g[cat]?.[day] || { amount: '', note: '' };
+      const newAmount = val;
+      const newNote = newAmount === '' ? '' : existing.note;
+      return {
+        ...g,
+        [cat]: {
+          ...g[cat],
+          [day]: { amount: newAmount, note: newNote }
+        }
+      };
+    });
     setDirty(true); setSaved(false);
+  };
+
+  const openPopover = (cat, day) => {
+    const note = grid[cat]?.[day]?.note || '';
+    setPopoverCell({ cat, day });
+    setTempNote(note);
+  };
+
+  const saveNote = () => {
+    if (!popoverCell) return;
+    const { cat, day } = popoverCell;
+    setGrid(g => ({
+      ...g,
+      [cat]: {
+        ...g[cat],
+        [day]: { ...g[cat][day], note: tempNote }
+      }
+    }));
+    setDirty(true); setSaved(false);
+    setPopoverCell(null);
   };
 
   const handleSave = async () => {
@@ -42,10 +88,11 @@ export default function SheetGrid({ year, month, transactions, saveSheet, onBack
     allCats.forEach(cat => {
       const type = expenseCats.includes(cat) ? 'expense' : 'income';
       dayArr.forEach(d => {
-        const amt = parseFloat(grid[cat]?.[d]);
+        const cell = grid[cat]?.[d];
+        const amt = parseFloat(cell?.amount);
         if (!isNaN(amt) && amt > 0) newTxList.push({
           date: `${year}-${padZ(month + 1)}-${padZ(d)}`,
-          type, category: cat, amount: amt, note: '', recurring: false, recurringFreq: 'monthly',
+          type, category: cat, amount: amt, note: cell?.note || '', recurring: false, recurringFreq: 'monthly',
         });
       });
     });
@@ -80,11 +127,13 @@ export default function SheetGrid({ year, month, transactions, saveSheet, onBack
       <td style={{ padding: '7px 14px', position: 'sticky', left: 0, zIndex: 2, background: bgColor, borderRight: `2px solid ${C.borderMid}`, borderTop: `1px solid ${color}55`, borderBottom: `1px solid ${color}55` }}>
         <span style={{ fontSize: 11.5, fontWeight: 600, color }}>{label}</span>
       </td>
-      {dayArr.map(d => { const v = dayFn(d); return (
-        <td key={d} style={{ ...tdC(d === todayDay), textAlign: 'right', fontWeight: 600, color: v > 0 ? color : C.textDisabled, background: d === todayDay ? bgColor : bgColor + '44', borderTop: `1px solid ${color}55`, borderBottom: `1px solid ${color}55` }}>
-          {v > 0 ? fmt(v) : ''}
-        </td>
-      );})}
+      {dayArr.map(d => {
+        const v = dayFn(d); return (
+          <td key={d} style={{ ...tdC(d === todayDay), textAlign: 'right', fontWeight: 600, color: v > 0 ? color : C.textDisabled, background: d === todayDay ? bgColor : bgColor + '44', borderTop: `1px solid ${color}55`, borderBottom: `1px solid ${color}55` }}>
+            {v > 0 ? fmt(v) : ''}
+          </td>
+        );
+      })}
       <td style={{ ...tdC(false), textAlign: 'right', fontWeight: 700, color, position: 'sticky', right: 0, zIndex: 2, background: bgColor, borderLeft: `2px solid ${C.borderMid}`, borderTop: `1px solid ${color}55`, borderBottom: `1px solid ${color}55` }}>
         {fmt(total)}
       </td>
@@ -110,8 +159,8 @@ export default function SheetGrid({ year, month, transactions, saveSheet, onBack
         </div>
 
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
-          {dirty  && <span style={{ fontSize: 11.5, color: C.yellow, background: C.yellowLight, border: `1px solid ${C.yellowBorder}`, padding: '3px 9px', borderRadius: 99 }}>Unsaved</span>}
-          {saved  && <span style={{ fontSize: 11.5, color: C.green,  background: C.greenLight,  border: `1px solid ${C.greenBorder}`,  padding: '3px 9px', borderRadius: 99 }}>Saved ✓</span>}
+          {dirty && <span style={{ fontSize: 11.5, color: C.yellow, background: C.yellowLight, border: `1px solid ${C.yellowBorder}`, padding: '3px 9px', borderRadius: 99 }}>Unsaved</span>}
+          {saved && <span style={{ fontSize: 11.5, color: C.green, background: C.greenLight, border: `1px solid ${C.greenBorder}`, padding: '3px 9px', borderRadius: 99 }}>Saved ✓</span>}
           <button onClick={handleSave} disabled={saving} className="btn-primary"
             style={{ background: C.accent, border: 'none', color: '#fff', borderRadius: 7, padding: '6px 18px', cursor: saving ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'inherit', opacity: saving ? 0.7 : 1, display: 'flex', alignItems: 'center', gap: 6 }}>
             {saving && <div className="spinner" style={{ width: 14, height: 14, borderTopColor: '#fff', borderWidth: 2 }} />}
@@ -143,7 +192,7 @@ export default function SheetGrid({ year, month, transactions, saveSheet, onBack
               {expenseCats.map(cat => {
                 const rTotal = rowTotal(cat);
                 const dotColor = getColor(cat, 'dot');
-                const bgColor  = getColor(cat, 'bg');
+                const bgColor = getColor(cat, 'bg');
                 return (
                   <tr key={cat} className="sheet-row">
                     <td className="sticky-left" style={{ padding: '6px 14px', position: 'sticky', left: 0, zIndex: 2, background: C.bgPanel, borderRight: `2px solid ${C.borderMid}`, borderBottom: `1px solid ${C.border}`, whiteSpace: 'nowrap', minWidth: 168 }}>
@@ -152,15 +201,39 @@ export default function SheetGrid({ year, month, transactions, saveSheet, onBack
                         <span style={{ color: C.textSecondary, fontSize: 13 }}>{cat}</span>
                       </div>
                     </td>
-                    {dayArr.map(d => (
-                      <td key={d} style={tdC(d === todayDay)}>
-                        <input className="cell-input" type="number" min="0" placeholder="·"
-                          value={grid[cat]?.[d] || ''}
-                          onChange={e => handleCell(cat, d, e.target.value)}
-                          style={{ color: grid[cat]?.[d] ? dotColor : undefined }}
-                        />
-                      </td>
-                    ))}
+                    {dayArr.map(d => {
+                      const cell = grid[cat]?.[d];
+                      const isFocused = focusedCell?.cat === cat && focusedCell?.day === d;
+                      const hasNote = !!cell?.note;
+                      const hasAmount = !!cell?.amount;
+                      return (
+                        <td key={d} style={{ ...tdC(d === todayDay), position: 'relative' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <input className="cell-input" type="number" min="0" placeholder="·"
+                              value={cell?.amount || ''}
+                              onChange={e => handleCell(cat, d, e.target.value)}
+                              onFocus={() => {
+                                if (blurTimeoutRef.current) clearTimeout(blurTimeoutRef.current);
+                                setFocusedCell({ cat, day: d });
+                              }}
+                              onBlur={() => {
+                                blurTimeoutRef.current = setTimeout(() => setFocusedCell(null), 200);
+                              }}
+                              style={{ color: cell?.amount ? dotColor : undefined, flex: 1 }}
+                            />
+                            {hasAmount && (isFocused || hasNote || (popoverCell?.cat === cat && popoverCell?.day === d)) && (
+                              <div
+                                title={hasNote ? cell.note : "Add Note"}
+                                onClick={() => openPopover(cat, d)}
+                                style={{ cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                              >
+                                <LinedCommentIcon color={hasNote ? C.orange : C.textDisabled} size={16} />
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                      );
+                    })}
                     <td style={{ ...tdC(false), textAlign: 'right', fontWeight: 600, color: rTotal > 0 ? dotColor : C.textDisabled, position: 'sticky', right: 0, zIndex: 2, background: rTotal > 0 ? bgColor : C.bgPanel, borderLeft: `2px solid ${C.borderMid}` }}>
                       {rTotal > 0 ? fmt(rTotal) : '—'}
                     </td>
@@ -173,7 +246,7 @@ export default function SheetGrid({ year, month, transactions, saveSheet, onBack
               {incomeTypes.map(cat => {
                 const rTotal = rowTotal(cat);
                 const dotColor = getColor(cat, 'dot');
-                const bgColor  = getColor(cat, 'bg');
+                const bgColor = getColor(cat, 'bg');
                 return (
                   <tr key={cat} className="sheet-row">
                     <td className="sticky-left" style={{ padding: '6px 14px', position: 'sticky', left: 0, zIndex: 2, background: C.bgPanel, borderRight: `2px solid ${C.borderMid}`, borderBottom: `1px solid ${C.border}`, whiteSpace: 'nowrap', minWidth: 168 }}>
@@ -182,15 +255,39 @@ export default function SheetGrid({ year, month, transactions, saveSheet, onBack
                         <span style={{ color: C.textSecondary, fontSize: 13 }}>{cat}</span>
                       </div>
                     </td>
-                    {dayArr.map(d => (
-                      <td key={d} style={tdC(d === todayDay)}>
-                        <input className="cell-input" type="number" min="0" placeholder="·"
-                          value={grid[cat]?.[d] || ''}
-                          onChange={e => handleCell(cat, d, e.target.value)}
-                          style={{ color: grid[cat]?.[d] ? dotColor : undefined }}
-                        />
-                      </td>
-                    ))}
+                    {dayArr.map(d => {
+                      const cell = grid[cat]?.[d];
+                      const isFocused = focusedCell?.cat === cat && focusedCell?.day === d;
+                      const hasNote = !!cell?.note;
+                      const hasAmount = !!cell?.amount;
+                      return (
+                        <td key={d} style={{ ...tdC(d === todayDay), position: 'relative' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                             <input className="cell-input" type="number" min="0" placeholder="·"
+                               value={cell?.amount || ''}
+                               onChange={e => handleCell(cat, d, e.target.value)}
+                               onFocus={() => {
+                                 if (blurTimeoutRef.current) clearTimeout(blurTimeoutRef.current);
+                                 setFocusedCell({ cat, day: d });
+                               }}
+                               onBlur={() => {
+                                 blurTimeoutRef.current = setTimeout(() => setFocusedCell(null), 200);
+                               }}
+                               style={{ color: cell?.amount ? dotColor : undefined, flex: 1 }}
+                             />
+                            {hasAmount && (isFocused || hasNote || (popoverCell?.cat === cat && popoverCell?.day === d)) && (
+                              <div
+                                title={hasNote ? cell.note : "Add Note"}
+                                onClick={() => openPopover(cat, d)}
+                                style={{ cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                              >
+                                <LinedCommentIcon color={hasNote ? C.orange : C.textDisabled} size={16} />
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                      );
+                    })}
                     <td style={{ ...tdC(false), textAlign: 'right', fontWeight: 600, color: rTotal > 0 ? dotColor : C.textDisabled, position: 'sticky', right: 0, zIndex: 2, background: rTotal > 0 ? bgColor : C.bgPanel, borderLeft: `2px solid ${C.borderMid}` }}>
                       {rTotal > 0 ? fmt(rTotal) : '—'}
                     </td>
@@ -204,11 +301,13 @@ export default function SheetGrid({ year, month, transactions, saveSheet, onBack
                 <td style={{ padding: '9px 14px', position: 'sticky', left: 0, zIndex: 2, background: C.bgPage, borderRight: `2px solid ${C.borderMid}`, borderTop: `2px solid ${C.borderMid}` }}>
                   <span style={{ fontSize: 12, fontWeight: 700, color: C.textPrimary }}>Net Balance</span>
                 </td>
-                {dayArr.map(d => { const v = dayIncome(d) - dayExpense(d); return (
-                  <td key={d} style={{ ...tdC(d === todayDay), textAlign: 'right', fontWeight: 700, fontSize: 12, color: v > 0 ? C.green : v < 0 ? C.red : C.textDisabled, borderTop: `2px solid ${C.borderMid}`, background: d === todayDay ? C.accentLight : C.bgPage }}>
-                    {v !== 0 ? (v > 0 ? '+' : '') + fmt(v) : ''}
-                  </td>
-                );})}
+                {dayArr.map(d => {
+                  const v = dayIncome(d) - dayExpense(d); return (
+                    <td key={d} style={{ ...tdC(d === todayDay), textAlign: 'right', fontWeight: 700, fontSize: 12, color: v > 0 ? C.green : v < 0 ? C.red : C.textDisabled, borderTop: `2px solid ${C.borderMid}`, background: d === todayDay ? C.accentLight : C.bgPage }}>
+                      {v !== 0 ? (v > 0 ? '+' : '') + fmt(v) : ''}
+                    </td>
+                  );
+                })}
                 <td style={{ padding: '9px 8px', textAlign: 'right', fontWeight: 700, fontSize: 13, color: (totalIncome - totalExpense) >= 0 ? C.green : C.red, position: 'sticky', right: 0, zIndex: 2, background: C.bgPage, borderLeft: `2px solid ${C.borderMid}`, borderTop: `2px solid ${C.borderMid}` }}>
                   {(totalIncome - totalExpense) >= 0 ? '+' : ''}{fmt(totalIncome - totalExpense)}
                 </td>
@@ -217,6 +316,45 @@ export default function SheetGrid({ year, month, transactions, saveSheet, onBack
           </table>
         </div>
       </div>
+      {popoverCell && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.05)', zIndex: 100,
+          display: 'flex', alignItems: 'center', justifyContent: 'center'
+        }} onClick={() => setPopoverCell(null)}>
+          <div style={{
+            background: C.bgPanel, border: `1px solid ${C.border}`, borderRadius: 10,
+            padding: 12, width: 260, boxShadow: C.shadow, position: 'relative'
+          }} onClick={e => e.stopPropagation()}>
+            <div style={{ fontSize: 11, color: C.textMuted, fontWeight: 700, textTransform: 'uppercase', marginBottom: 8, display: 'flex', justifyContent: 'space-between' }}>
+              <span>Note</span>
+              <span>{popoverCell.day} {FULL_MONTHS[month].slice(0, 3)}</span>
+            </div>
+            <textarea
+              autoFocus
+              value={tempNote}
+              onChange={e => setTempNote(e.target.value)}
+              placeholder="Add details..."
+              style={{
+                width: '100%', minHeight: 60, background: C.bgPage, border: `1px solid ${C.border}`,
+                borderRadius: 6, padding: 8, fontSize: 12.5, fontFamily: 'inherit', outline: 'none', resize: 'none'
+              }}
+            />
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6, marginTop: 10 }}>
+              <button
+                onClick={() => setPopoverCell(null)}
+                className="btn-ghost"
+                style={{ padding: '4px 10px', fontSize: 11, borderRadius: 5 }}
+              >Cancel</button>
+              <button
+                onClick={saveNote}
+                className="btn-primary"
+                style={{ padding: '4px 12px', fontSize: 11, background: C.orange, borderRadius: 5 }}
+              >Save</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

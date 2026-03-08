@@ -8,7 +8,7 @@ export async function fetchUserWorkspaces() {
     .from('workspace_members')
     .select('role, workspaces(id, name)')
     .order('created_at', { ascending: false });
-    
+
   if (error) throw error;
   return data.map(row => {
     const wsData = Array.isArray(row.workspaces) ? row.workspaces[0] : row.workspaces;
@@ -33,12 +33,18 @@ export async function fetchWorkspaceSettings(workspaceId) {
   return data;
 }
 
-export async function saveWorkspaceSettings(workspaceId, expenseCats, incomeTypes) {
+export async function saveWorkspaceSettings(workspaceId, expenseCats, incomeTypes, customCategories = []) {
   const supabase = createClient();
   const { error } = await supabase
     .from('workspace_settings')
     .upsert(
-      { workspace_id: workspaceId, expense_cats: expenseCats, income_types: incomeTypes, updated_at: new Date().toISOString() },
+      { 
+        workspace_id: workspaceId, 
+        expense_cats: expenseCats, 
+        income_types: incomeTypes, 
+        custom_categories: customCategories,
+        updated_at: new Date().toISOString() 
+      },
       { onConflict: 'workspace_id' }
     );
   if (error) throw error;
@@ -48,14 +54,14 @@ export async function saveWorkspaceSettings(workspaceId, expenseCats, incomeType
 
 export async function getWorkspaceMembers(workspaceId) {
   const supabase = createClient();
-  
+
   // We need generic user info, but auth.users is often protected.
   // Instead we'll just get the member rows. We might only show roles & IDs since we lack a profiles table.
   const { data, error } = await supabase
     .from('workspace_members')
     .select('user_id, role, created_at')
     .eq('workspace_id', workspaceId);
-    
+
   if (error) throw error;
   return data;
 }
@@ -67,42 +73,42 @@ export async function createInvite(workspaceId, role, email) {
     .insert({ workspace_id: workspaceId, role, email })
     .select('token')
     .single();
-    
+
   if (error) throw error;
   return data.token;
 }
 
 export async function acceptInvite(token) {
   const supabase = createClient();
-  
+
   // 1. Get the invite details
   const { data: invite, error: invErr } = await supabase
     .from('workspace_invites')
     .select('workspace_id, role, email')
     .eq('token', token)
     .single();
-    
+
   if (invErr) throw invErr;
-  
+
   // 2. Insert member using our own UID
   const { data: userData, error: userErr } = await supabase.auth.getUser();
   if (userErr) throw userErr;
-  
+
   // Verify matching email
   if (userData.user.email.toLowerCase() !== invite.email.toLowerCase()) {
     throw new Error(`This invitation was sent to ${invite.email}, please log in with that account to accept it.`);
   }
-  
+
   const { error: joinErr } = await supabase
     .from('workspace_members')
     .insert({ workspace_id: invite.workspace_id, user_id: userData.user.id, role: invite.role });
-    
+
   // Ignore conflict if already a member
   if (joinErr && joinErr.code !== '23505') throw joinErr;
-  
+
   // Delete the invite token after successful use
   await supabase.from('workspace_invites').delete().eq('token', token);
-  
+
   return invite.workspace_id;
 }
 
@@ -153,7 +159,7 @@ export async function upsertSheetTransactions(workspaceId, year, month, transact
     .eq('workspace_id', workspaceId)
     .gte('date', `${monthStr}-01`)
     .lte('date', `${monthStr}-31`);
-  
+
   if (fetchErr) throw fetchErr;
 
   // 2. Map existing by key (category + date)
@@ -181,8 +187,8 @@ export async function upsertSheetTransactions(workspaceId, year, month, transact
     const existingRow = existingMap[key];
 
     if (existingRow) {
-      if (Number(existingRow.amount) !== amt) {
-        toUpdate.push({ id: existingRow.id, amount: amt });
+      if (Number(existingRow.amount) !== amt || existingRow.note !== (t.note || '')) {
+        toUpdate.push({ id: existingRow.id, amount: amt, note: t.note || '' });
       }
     } else {
       toInsert.push({
@@ -210,7 +216,7 @@ export async function upsertSheetTransactions(workspaceId, year, month, transact
   if (toDelete.length > 0) ops.push(supabase.from('transactions').delete().in('id', toDelete));
   if (toInsert.length > 0) ops.push(supabase.from('transactions').insert(toInsert));
   toUpdate.forEach(u => {
-    ops.push(supabase.from('transactions').update({ amount: u.amount }).eq('id', u.id));
+    ops.push(supabase.from('transactions').update({ amount: u.amount, note: u.note }).eq('id', u.id));
   });
 
   const results = await Promise.all(ops);
@@ -223,13 +229,13 @@ export async function insertTransaction(workspaceId, tx) {
   const { data, error } = await supabase
     .from('transactions')
     .insert({
-      workspace_id:   workspaceId,
-      date:           tx.date,
-      type:           tx.type,
-      category:       tx.category,
-      amount:         Number(tx.amount),
-      note:           tx.note || '',
-      recurring:      tx.recurring || false,
+      workspace_id: workspaceId,
+      date: tx.date,
+      type: tx.type,
+      category: tx.category,
+      amount: Number(tx.amount),
+      note: tx.note || '',
+      recurring: tx.recurring || false,
       recurring_freq: tx.recurringFreq || 'monthly',
     })
     .select()
@@ -248,13 +254,13 @@ export async function deleteTransaction(txId) {
 
 function normalise(row) {
   return {
-    id:            row.id,
-    date:          row.date,
-    type:          row.type,
-    category:      row.category,
-    amount:        Number(row.amount),
-    note:          row.note || '',
-    recurring:     row.recurring || false,
+    id: row.id,
+    date: row.date,
+    type: row.type,
+    category: row.category,
+    amount: Number(row.amount),
+    note: row.note || '',
+    recurring: row.recurring || false,
     recurringFreq: row.recurring_freq || 'monthly',
   };
 }

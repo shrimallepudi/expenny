@@ -76,6 +76,7 @@ export default async function HomePage() {
 
   const expenseCats = settings?.expense_cats || DEFAULT_EXPENSE_CATS;
   const incomeTypes = settings?.income_types || DEFAULT_INCOME_TYPES;
+  const customCats = settings?.custom_categories || [];
 
   return (
     <AppShell
@@ -85,6 +86,7 @@ export default async function HomePage() {
       initialTransactions={transactions}
       initialExpenseCats={expenseCats}
       initialIncomeTypes={incomeTypes}
+      initialCustomCats={customCats}
     />
   );
 }

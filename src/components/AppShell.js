@@ -17,12 +17,13 @@ const TABS = ['Expenses', 'Budget', 'Calendar', 'Master', 'Activity', 'Reports']
 const today = new Date();
 const CY = today.getFullYear();
 
-export default function AppShell({ userEmail, workspaces, initialWorkspace, initialTransactions, initialExpenseCats, initialIncomeTypes }) {
+export default function AppShell({ userEmail, workspaces, initialWorkspace, initialTransactions, initialExpenseCats, initialIncomeTypes, initialCustomCats = [] }) {
   const [activeWorkspace, setActiveWorkspace] = useState(initialWorkspace);
   const [tab, setTab] = useState('Expenses');
   const [transactions, setTx] = useState(initialTransactions);
   const [expenseCats, setExpenseCats] = useState(initialExpenseCats);
   const [incomeTypes, setIncomeTypes] = useState(initialIncomeTypes);
+  const [customCats, setCustomCats] = useState(initialCustomCats); 
   const [openSheet, setOpenSheet] = useState(null); // null | {year,month}
   const [calYear, setCalYear] = useState(CY);
   const [saving, setSaving] = useState(false);
@@ -78,6 +79,7 @@ export default function AppShell({ userEmail, workspaces, initialWorkspace, init
         if (newSettings) {
           setExpenseCats(newSettings.expense_cats);
           setIncomeTypes(newSettings.income_types);
+          setCustomCats(newSettings.custom_categories || []);
         } else {
           // If no settings exist yet for this workspace, fallback to current or defaults
           // (Usually handled on creation)
@@ -132,9 +134,9 @@ export default function AppShell({ userEmail, workspaces, initialWorkspace, init
   }, []);
 
   // ── Save settings
-  const persistSettings = useCallback(async (cats, types, silent = false) => {
+  const persistSettings = useCallback(async (cats, types, custom = [], silent = false) => {
     try {
-      await saveWorkspaceSettings(activeWorkspace.id, cats, types);
+      await saveWorkspaceSettings(activeWorkspace.id, cats, types, custom);
       if (!silent) toast.success('Settings updated', { style: { background: '#10b981', color: '#fff' } });
     } catch (e) {
       toast.error(e.message, { style: { background: '#ef4444', color: '#fff' } });
@@ -144,14 +146,20 @@ export default function AppShell({ userEmail, workspaces, initialWorkspace, init
   const handleSetExpenseCats = useCallback((v) => {
     const next = typeof v === 'function' ? v(expenseCats) : v;
     setExpenseCats(next);
-    persistSettings(next, incomeTypes);
-  }, [expenseCats, incomeTypes, persistSettings]);
+    persistSettings(next, incomeTypes, customCats);
+  }, [expenseCats, incomeTypes, customCats, persistSettings]);
 
   const handleSetIncomeTypes = useCallback((v) => {
     const next = typeof v === 'function' ? v(incomeTypes) : v;
     setIncomeTypes(next);
-    persistSettings(expenseCats, next);
-  }, [expenseCats, incomeTypes, persistSettings]);
+    persistSettings(expenseCats, next, customCats);
+  }, [expenseCats, incomeTypes, customCats, persistSettings]);
+
+  const handleSetCustomCats = useCallback((v) => {
+    const next = typeof v === 'function' ? v(customCats) : v;
+    setCustomCats(next);
+    persistSettings(expenseCats, incomeTypes, next);
+  }, [expenseCats, incomeTypes, customCats, persistSettings]);
 
   return (
     <div style={{ minHeight: '100vh', background: C.bgPage, color: C.textPrimary, fontFamily: "'Work Sans', sans-serif", fontSize: 14 }}>
@@ -269,7 +277,7 @@ export default function AppShell({ userEmail, workspaces, initialWorkspace, init
         {tab === 'Activity' && <ActivityView workspace={activeWorkspace} />}
         {tab === 'Reports' && <ReportsView transactions={transactions} expenseCats={expenseCats} incomeTypes={incomeTypes} />}
         {tab === 'Calendar' && <CalendarView year={calYear} setYear={setCalYear} transactions={transactions} />}
-        {tab === 'Master' && <MasterSettings expenseCats={expenseCats} setExpenseCats={handleSetExpenseCats} incomeTypes={incomeTypes} setIncomeTypes={handleSetIncomeTypes} activeWorkspace={activeWorkspace} />}
+        {tab === 'Master' && <MasterSettings expenseCats={expenseCats} setExpenseCats={handleSetExpenseCats} incomeTypes={incomeTypes} setIncomeTypes={handleSetIncomeTypes} customCats={customCats} setCustomCats={handleSetCustomCats} activeWorkspace={activeWorkspace} />}
       </div>
 
       {/* ── Workspace Settings Modal ── */}

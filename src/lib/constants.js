@@ -23,6 +23,7 @@ export const C = {
   yellow:       '#b5860d',
   yellowLight:  '#fdf8ec',
   yellowBorder: '#e8d8a0',
+  orange:       '#f2994a',
   shadow:       '0 1px 3px rgba(26,25,21,0.08), 0 1px 2px rgba(26,25,21,0.04)',
   shadowMd:     '0 4px 12px rgba(26,25,21,0.08), 0 2px 4px rgba(26,25,21,0.04)',
   shadowLg:     '0 8px 24px rgba(26,25,21,0.10), 0 4px 8px rgba(26,25,21,0.06)',
