@@ -1,16 +1,29 @@
 'use client';
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { C } from '@/lib/constants';
+import { Toaster, toast } from 'react-hot-toast';
 
 export default function LoginPage() {
+  return (
+    <Suspense fallback={<div style={{ minHeight: '100vh', background: C.bgPage, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><div className="spinner" /></div>}>
+      <LoginContent />
+    </Suspense>
+  );
+}
+
+function LoginContent() {
   const [mode, setMode]       = useState('login'); // 'login' | 'signup' | 'forgot'
   const [email, setEmail]     = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState('');
   const [message, setMessage] = useState('');
-
+  
+  const searchParams = useSearchParams();
+  const next = searchParams.get('next') || '/';
+  
   const supabase = createClient();
 
   const handleSubmit = async (e) => {
@@ -22,18 +35,22 @@ export default function LoginPage() {
           redirectTo: `${window.location.origin}/auth/callback`,
         });
         if (error) throw error;
+        toast.success('Check your email for a password reset link', { style: { background: '#10b981', color: '#fff' }});
         setMessage('Check your email for a password reset link.');
       } else if (mode === 'signup') {
         const { error } = await supabase.auth.signUp({ email, password });
         if (error) throw error;
+        toast.success('Account created! Check your email.', { style: { background: '#10b981', color: '#fff' }});
         setMessage('Account created! Check your email to confirm, then log in.');
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
-        window.location.href = '/';
+        toast('Signing in...', { icon: '👋', style: { background: '#1f2937', color: '#fff' }});
+        window.location.href = next;
       }
     } catch (err) {
       setError(err.message);
+      toast.error(err.message, { style: { background: '#ef4444', color: '#fff' }});
     } finally {
       setLoading(false);
     }
@@ -47,6 +64,7 @@ export default function LoginPage() {
 
   return (
     <div style={{ minHeight: '100vh', background: C.bgPage, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+      <Toaster position="bottom-right" />
       <div style={{ width: '100%', maxWidth: 400 }}>
         {/* Logo */}
         <div style={{ textAlign: 'center', marginBottom: 36 }}>

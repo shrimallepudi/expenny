@@ -113,7 +113,8 @@ export default function SheetGrid({ year, month, transactions, saveSheet, onBack
           {dirty  && <span style={{ fontSize: 11.5, color: C.yellow, background: C.yellowLight, border: `1px solid ${C.yellowBorder}`, padding: '3px 9px', borderRadius: 99 }}>Unsaved</span>}
           {saved  && <span style={{ fontSize: 11.5, color: C.green,  background: C.greenLight,  border: `1px solid ${C.greenBorder}`,  padding: '3px 9px', borderRadius: 99 }}>Saved ✓</span>}
           <button onClick={handleSave} disabled={saving} className="btn-primary"
-            style={{ background: C.accent, border: 'none', color: '#fff', borderRadius: 7, padding: '6px 18px', cursor: saving ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'inherit', opacity: saving ? 0.7 : 1 }}>
+            style={{ background: C.accent, border: 'none', color: '#fff', borderRadius: 7, padding: '6px 18px', cursor: saving ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'inherit', opacity: saving ? 0.7 : 1, display: 'flex', alignItems: 'center', gap: 6 }}>
+            {saving && <div className="spinner" style={{ width: 14, height: 14, borderTopColor: '#fff', borderWidth: 2 }} />}
             {saving ? 'Saving…' : 'Save & Close'}
           </button>
         </div>

@@ -2,8 +2,9 @@
 import { useState, useMemo } from 'react';
 import { C, EXPENSE_SECTIONS, CAT_COLORS, INC_COLORS } from '@/lib/constants';
 import { iSt } from './ui';
+import { toast } from 'react-hot-toast';
 
-export default function MasterSettings({ expenseCats, setExpenseCats, incomeTypes, setIncomeTypes }) {
+export default function MasterSettings({ expenseCats, setExpenseCats, incomeTypes, setIncomeTypes, activeWorkspace }) {
   const [activeTab, setActiveTab] = useState('expenses');
   const [search, setSearch] = useState('');
 
@@ -37,7 +38,10 @@ export default function MasterSettings({ expenseCats, setExpenseCats, incomeType
 
       {/* Sub-tabs */}
       <div style={{ display: 'flex', gap: 0, borderBottom: `1px solid ${C.border}`, marginBottom: 24 }}>
-        {[['expenses', 'Expense Categories'], ['income', 'Income Types']].map(([key, label]) => (
+        {[
+          ['expenses', 'Expense Categories'], 
+          ['income', 'Income Types']
+        ].map(([key, label]) => (
           <button key={key} onClick={() => setActiveTab(key)} style={{
             padding: '8px 20px', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit',
             fontSize: 13.5, fontWeight: activeTab === key ? 600 : 400,
@@ -102,9 +106,9 @@ export default function MasterSettings({ expenseCats, setExpenseCats, incomeType
             <div style={{ fontSize: 12, color: C.textMuted, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 10 }}>Add Custom Category</div>
             <div style={{ display: 'flex', gap: 8 }}>
               <input placeholder="e.g. Pet Care, Hobby Supplies..."
-                onKeyDown={e => { if (e.key === 'Enter' && e.target.value.trim()) { setExpenseCats(c => [...c, e.target.value.trim()]); e.target.value = ''; } }}
+                onKeyDown={e => { if (e.key === 'Enter' && e.target.value.trim()) { setExpenseCats(c => { const val = e.target.value.trim(); if(c.includes(val)) { toast.error('Category already exists', { style: { background: '#ef4444', color: '#fff' }}); return c; } return [...c, val]; }); e.target.value = ''; } }}
                 style={{ ...iSt(), flex: 1 }} />
-              <button onClick={e => { const inp = e.target.previousSibling; if (inp.value.trim()) { setExpenseCats(c => [...c, inp.value.trim()]); inp.value = ''; } }}
+              <button onClick={e => { const inp = e.target.previousSibling; if (inp.value.trim()) { setExpenseCats(c => { const val = inp.value.trim(); if(c.includes(val)){ toast.error('Category already exists', { style: { background: '#ef4444', color: '#fff' }}); return c; } return [...c, val];}); inp.value = ''; } }}
                 className="btn-primary" style={{ background: C.accent, border: 'none', color: '#fff', borderRadius: 8, padding: '0 18px', cursor: 'pointer', fontSize: 13.5, fontWeight: 600, fontFamily: 'inherit' }}>Add</button>
             </div>
             {expenseCats.filter(c => !CAT_COLORS[c]).length > 0 && (
@@ -113,7 +117,7 @@ export default function MasterSettings({ expenseCats, setExpenseCats, incomeType
                   <div key={c} style={{ display: 'flex', alignItems: 'center', gap: 5, background: C.bgPage, border: `1px solid ${C.border}`, borderRadius: 7, padding: '4px 10px' }}>
                     <div style={{ width: 7, height: 7, borderRadius: '50%', background: C.textMuted, flexShrink: 0 }} />
                     <span style={{ fontSize: 12.5, color: C.textSecondary }}>{c}</span>
-                    <button onClick={() => setExpenseCats(prev => prev.filter(x => x !== c))} style={{ background: 'none', border: 'none', color: C.textMuted, cursor: 'pointer', fontSize: 13, lineHeight: 1, padding: 0, marginLeft: 2 }}>×</button>
+                    <button onClick={() => { setExpenseCats(prev => prev.filter(x => x !== c)); }} style={{ background: 'none', border: 'none', color: C.textMuted, cursor: 'pointer', fontSize: 13, lineHeight: 1, padding: 0, marginLeft: 2 }}>×</button>
                   </div>
                 ))}
               </div>
@@ -132,9 +136,9 @@ export default function MasterSettings({ expenseCats, setExpenseCats, incomeType
             <div style={{ padding: 16 }}>
               <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
                 <input placeholder="Add income type..."
-                  onKeyDown={e => { if (e.key === 'Enter' && e.target.value.trim()) { setIncomeTypes(c => [...c, e.target.value.trim()]); e.target.value = ''; } }}
+                  onKeyDown={e => { if (e.key === 'Enter' && e.target.value.trim()) { setIncomeTypes(c => { const val = e.target.value.trim(); if(c.includes(val)) { toast.error('Income type already exists', { style: { background: '#ef4444', color: '#fff' }}); return c; } return [...c, val]; }); e.target.value = ''; } }}
                   style={{ ...iSt(), flex: 1 }} />
-                <button onClick={e => { const inp = e.target.previousSibling; if (inp.value.trim()) { setIncomeTypes(c => [...c, inp.value.trim()]); inp.value = ''; } }}
+                <button onClick={e => { const inp = e.target.previousSibling; if (inp.value.trim()) { setIncomeTypes(c => { const val = inp.value.trim(); if(c.includes(val)) { toast.error('Income type already exists', { style: { background: '#ef4444', color: '#fff' }}); return c; } return [...c, val]; }); inp.value = ''; } }}
                   className="btn-primary" style={{ background: C.accent, border: 'none', color: '#fff', borderRadius: 8, padding: '0 18px', cursor: 'pointer', fontSize: 13.5, fontWeight: 600, fontFamily: 'inherit' }}>Add</button>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -162,7 +166,7 @@ export default function MasterSettings({ expenseCats, setExpenseCats, incomeType
         <p style={{ color: C.textSecondary, fontSize: 13.5, lineHeight: 1.8 }}>
           Check or uncheck categories to control which rows appear in your monthly expense sheets.
           All {totalAll} categories from the master list are available — only active ones show in the grid.
-          Changes are saved to your account automatically.
+          Changes are saved to your workspace automatically.
         </p>
       </div>
     </div>

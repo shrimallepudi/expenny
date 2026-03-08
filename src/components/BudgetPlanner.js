@@ -95,7 +95,8 @@ export default function BudgetPlanner({ transactions, addTx, delTx, expenseCats,
           </div>
           <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
             <button onClick={handleSubmit} disabled={loading} className="btn-primary"
-              style={{ background: C.accent, border: 'none', color: '#fff', borderRadius: 8, padding: '8px 18px', cursor: loading ? 'not-allowed' : 'pointer', fontSize: 13.5, fontWeight: 600, fontFamily: 'inherit', opacity: loading ? 0.7 : 1 }}>
+              style={{ background: C.accent, border: 'none', color: '#fff', borderRadius: 8, padding: '8px 18px', cursor: loading ? 'not-allowed' : 'pointer', fontSize: 13.5, fontWeight: 600, fontFamily: 'inherit', opacity: loading ? 0.7 : 1, display: 'flex', alignItems: 'center', gap: 6 }}>
+              {loading && <div className="spinner" style={{ width: 14, height: 14, borderTopColor: '#fff', borderWidth: 2 }} />}
               {loading ? 'Saving…' : 'Add Entry'}
             </button>
             <button onClick={() => setShowAdd(false)} className="btn-ghost"
